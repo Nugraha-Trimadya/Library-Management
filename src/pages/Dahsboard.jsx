@@ -55,9 +55,13 @@ const Dashboard = () => {
         const totalBooks = books.length;
         const totalLendings = lendings.length;
         const totalReturned = lendings.filter(l => l.status_pengembalian === 1).length;
-        const totalFines = fines.length;
+        
+        // Calculate total fine amount
+        const totalFines = fines.reduce((sum, fine) => {
+          return sum + (Number(fine.jumlah_denda) || 0);
+        }, 0);
 
-        // update state dashboard
+        // Calculate other stats
         const booksBorrowed = lendings.filter(l => l.status_pengembalian === 0).length;
         const dueReturns = lendings.filter(l =>
           l.status_pengembalian === 0 &&
@@ -213,29 +217,6 @@ const Dashboard = () => {
       iconColor: "text-red-500",
     },
     {
-      title: "Total Fines",
-      value: stats.totalFines?.toLocaleString() || "0",
-      icon: (
-        <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth="1.5"
-            d="M12 8c-1.657 0-3 1.567-3 3.5S10.343 15 12 15s3-1.567 3-3.5-1.343-3.5-3-3.5z"
-          />
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth="1.5"
-            d="M12 3v3m0 12v3m9-9h-3M6 12H3"
-          />
-        </svg>
-      ),
-      bgColor: "bg-yellow-50",
-      textColor: "text-yellow-600",
-      iconColor: "text-yellow-500",
-    },
-    {
       title: "Total Returned",
       value: stats.totalReturned?.toLocaleString() || "0",
       icon: (
@@ -244,13 +225,30 @@ const Dashboard = () => {
             strokeLinecap="round"
             strokeLinejoin="round"
             strokeWidth="1.5"
-            d="M9 12l2 2 4-4m2 2v6a2 2 0 01-2 2H7a2 2 0 01-2-2v-6a2 2 0 012-2h7z"
+            d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
           />
         </svg>
       ),
       bgColor: "bg-teal-50",
       textColor: "text-teal-600",
       iconColor: "text-teal-500",
+    },
+    {
+      title: "Total Fines",
+      value: `Rp ${stats.totalFines?.toLocaleString('id-ID') || "0"}`,
+      icon: (
+        <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="1.5"
+            d="M12 8c-1.657 0-3 1.567-3 3.5S10.343 15 12 15s3-1.567 3-3.5-1.343-3.5-3-3.5z M12 8c-1.657 0-3 1.567-3 3.5S10.343 15 12 15s3-1.567 3-3.5-1.343-3.5-3-3.5z"
+          />
+        </svg>
+      ),
+      bgColor: "bg-rose-50",
+      textColor: "text-rose-600",
+      iconColor: "text-rose-500",
     },
   ];
 

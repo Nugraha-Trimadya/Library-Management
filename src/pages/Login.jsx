@@ -34,7 +34,7 @@ export default function Login() {
                     Swal.fire({
                         icon: 'success',
                         title: 'Login Successful!',
-                        text: 'Welcome back ' + res.data.name,
+                        text: 'Welcome back! ',
                         timer: 1500,
                         showConfirmButton: false
                     }).then(() => {

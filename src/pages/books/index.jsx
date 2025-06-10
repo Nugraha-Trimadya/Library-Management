@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { FaEye, FaEdit, FaTrash, FaSearch, FaFilter, FaTimes, FaPlus, FaSync, FaSort, FaCheck } from 'react-icons/fa';
-import { Plus, Search, Filter, Check, X } from 'react-feather';
+import { FaEye, FaEdit, FaTrash, FaSearch, FaTimes, FaPlus } from 'react-icons/fa';
+import { Plus, Search, Check, X } from 'react-feather';
 import Swal from 'sweetalert2';
 import { useNavigate } from 'react-router-dom';
 import { useHotkeys } from 'react-hotkeys-hook';
@@ -136,10 +136,7 @@ export default function Books() {
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
-  const [filters, setFilters] = useState({
-    tahun: '',
-    penerbit: ''
-  });
+  const [selectedRows, setSelectedRows] = useState([]);
   const [formData, setFormData] = useState({
     no_rak: '',
     judul: '',
@@ -503,31 +500,19 @@ export default function Books() {
     setCurrentPage(pageNumber);
   };
 
-  // Filter and search books
-  const filteredBooks = books.filter(book => {
-    const matchesSearch = (
-      book.judul.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      book.pengarang.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      book.penerbit.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-
-    const matchesFilters = (
-      (!filters.tahun || book.tahun_terbit.toString() === filters.tahun) &&
-      (!filters.penerbit || book.penerbit.toLowerCase().includes(filters.penerbit.toLowerCase()))
-    );
-
-    return matchesSearch && matchesFilters;
-  });
+  // Search and paginate books
+  const searchedBooks = books.filter(book => 
+    book.judul.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    book.pengarang.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    book.penerbit.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   // Pagination
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentItems = filteredBooks.slice(indexOfFirstItem, indexOfLastItem);
-  const totalPages = Math.ceil(filteredBooks.length / itemsPerPage);
-  const [selectedRows, setSelectedRows] = useState([]);
-  const [activeFilters, setActiveFilters] = useState(false);
+  const currentItems = searchedBooks.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(searchedBooks.length / itemsPerPage);
 
-  // Handle row selection
   const handleSelectRow = (id, isChecked) => {
     if (isChecked) {
       setSelectedRows([...selectedRows, id]);
@@ -545,7 +530,7 @@ export default function Books() {
   };
 
   return (
-      <div className="flex-1 overflow-auto pl-6">
+      <div className="flex-1 overflow-auto px-6">
         <Card className="my-6 mr-6 border-none shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-2xl font-bold">Book Management</CardTitle>
@@ -560,7 +545,7 @@ export default function Books() {
           
           <CardContent>
             <div className="flex flex-col space-y-4">
-              {/* Search and filters */}
+              {/* Search */}
               <div className="flex flex-col md:flex-row gap-4">
                 <div className="relative flex-1">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
@@ -570,168 +555,83 @@ export default function Books() {
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                   />
-                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 text-xs">
-                    Ctrl + K
-                  </div>
                 </div>
-                <div className="flex gap-4">
-                  <Select 
-                    className="w-48 bg-white"
-                    value={filters.tahun}
-                    onChange={(e) => {
-                      setFilters({ ...filters, tahun: e.target.value });
-                      setActiveFilters(e.target.value !== '' || filters.penerbit !== '');
-                    }}
-                  >
-                    <option value="">Filter by Year</option>
-                    {[...new Set(books.map(book => book.tahun_terbit))].sort().map(year => (
-                      <option key={year} value={year}>{year}</option>
-                    ))}
-                  </Select>
-                  <Select 
-                    className="w-48 bg-white"
-                    value={filters.penerbit}
-                    onChange={(e) => {
-                      setFilters({ ...filters, penerbit: e.target.value });
-                      setActiveFilters(e.target.value !== '' || filters.tahun !== '');
-                    }}
-                  >
-                    <option value="">Filter by Publisher</option>
-                    {[...new Set(books.map(book => book.penerbit))].sort().map(publisher => (
-                      <option key={publisher} value={publisher}>{publisher}</option>
-                    ))}
-                  </Select>
-                </div>
-              </div>
-
-              {/* Active filters indicator */}
-              <div className="flex items-center text-sm text-gray-500 bg-gray-100 px-3 py-1.5 rounded-md w-fit">
-                <Filter size={14} className="mr-2" />
-                {activeFilters ? 'Active filters' : 'No active filters'}
               </div>
 
               {/* Table */}
               <div className="border rounded-md overflow-hidden">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="bg-gray-50 hover:bg-gray-50">
-                      <TableHead className="w-12 text-center">
-                        <input 
-                          type="checkbox" 
-                          className="rounded"
-                          onChange={(e) => handleSelectAll(e.target.checked)}
-                          checked={selectedRows.length === currentItems.length && currentItems.length > 0}
-                        />
-                      </TableHead>
-                      <TableHead className="w-16">NO</TableHead>
-                      <TableHead className="w-24">
-                        <div className="flex items-center">
-                          NO RAK
-                          <Filter size={14} className="ml-1 text-gray-400" />
-                        </div>
-                      </TableHead>
-                      <TableHead>
-                        <div className="flex items-center">
-                          JUDUL
-                          <Filter size={14} className="ml-1 text-gray-400" />
-                        </div>
-                      </TableHead>
-                      <TableHead>
-                        <div className="flex items-center">
-                          PENGARANG
-                          <Filter size={14} className="ml-1 text-gray-400" />
-                        </div>
-                      </TableHead>
-                      <TableHead>
-                        <div className="flex items-center">
-                          PENERBIT
-                          <Filter size={14} className="ml-1 text-gray-400" />
-                        </div>
-                      </TableHead>
-                      <TableHead>
-                        <div className="flex items-center">
-                          TAHUN
-                          <Filter size={14} className="ml-1 text-gray-400" />
-                        </div>
-                      </TableHead>
-                      <TableHead>
-                        <div className="flex items-center">
-                          STOK
-                          <Filter size={14} className="ml-1 text-gray-400" />
-                        </div>
-                      </TableHead>
-                      <TableHead>STATUS</TableHead>
-                      <TableHead>DETAIL</TableHead>
-                      <TableHead>ACTIONS</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {currentItems.map((book, index) => (
-                      <TableRow key={book.id} className="hover:bg-gray-50">
-                        <TableCell className="text-center">
-                          <input 
-                            type="checkbox" 
-                            className="rounded"
-                            checked={selectedRows.includes(book.id)}
-                            onChange={(e) => handleSelectRow(book.id, e.target.checked)}
-                          />
-                        </TableCell>
-                        <TableCell>{indexOfFirstItem + index + 1}</TableCell>
-                        <TableCell>{book.no_rak}</TableCell>
-                        <TableCell className="font-medium">{book.judul}</TableCell>
-                        <TableCell>{book.pengarang}</TableCell>
-                        <TableCell>{book.penerbit}</TableCell>
-                        <TableCell>{book.tahun_terbit}</TableCell>
-                        <TableCell>{book.stok}</TableCell>
-                        <TableCell>
-                          {parseInt(book.stok) > 0 ? (
-                            <Badge className="bg-green-100 text-green-800 hover:bg-green-100">
-                              <Check size={14} className="mr-1" /> Available
-                            </Badge>
-                          ) : (
-                            <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100">
-                              <X size={14} className="mr-1" /> Out of Stock
-                            </Badge>
-                          )}
-                        </TableCell>
-                        <TableCell className="max-w-xs truncate">
-                          {book.detail || 'No details'}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center space-x-3">
-                            <button
-                              onClick={() => handleDetail(book)}
-                              className="text-blue-600 hover:text-blue-900"
-                              title="View Details"
-                            >
-                              <FaEye size={18} />
-                            </button>
-                            <button
-                              onClick={() => handleEdit(book)}
-                              className="text-emerald-600 hover:text-emerald-900"
-                              title="Edit"
-                            >
-                              <FaEdit size={18} />
-                            </button>
-                            <button
-                              onClick={() => handleDelete(book)}
-                              className="text-rose-600 hover:text-rose-900"
-                              title="Delete"
-                            >
-                              <FaTrash size={18} />
-                            </button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <TableHead className="w-16">NO</TableHead>
+                        <TableHead className="w-24">NO RAK</TableHead>
+                        <TableHead className="w-1/4">JUDUL</TableHead>
+                        <TableHead>PENGARANG</TableHead>
+                        <TableHead>PENERBIT</TableHead>
+                        <TableHead className="w-20">TAHUN</TableHead>
+                        <TableHead className="w-20">STOK</TableHead>
+                        <TableHead className="w-28">STATUS</TableHead>
+                        <TableHead className="w-32 text-center">ACTIONS</TableHead>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {currentItems.map((book, index) => (
+                        <tr key={book.id} className="hover:bg-gray-50">
+                          <TableCell>{indexOfFirstItem + index + 1}</TableCell>
+                          <TableCell>{book.no_rak}</TableCell>
+                          <TableCell className="font-medium max-w-xs truncate">{book.judul}</TableCell>
+                          <TableCell className="max-w-xs truncate">{book.pengarang}</TableCell>
+                          <TableCell className="max-w-xs truncate">{book.penerbit}</TableCell>
+                          <TableCell>{book.tahun_terbit}</TableCell>
+                          <TableCell>{book.stok}</TableCell>
+                          <TableCell>
+                            {parseInt(book.stok) > 0 ? (
+                              <Badge className="bg-green-100 text-green-800">
+                                <Check size={14} className="mr-1" /> Available
+                              </Badge>
+                            ) : (
+                              <Badge className="bg-amber-100 text-amber-800">
+                                <X size={14} className="mr-1" /> Out of Stock
+                              </Badge>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center justify-center space-x-2">
+                              <button
+                                onClick={() => handleDetail(book)}
+                                className="p-1 text-gray-600 hover:text-blue-600 transition-colors"
+                                title="View Details"
+                              >
+                                <FaEye size={18} />
+                              </button>
+                              <button
+                                onClick={() => handleEdit(book)}
+                                className="p-1 text-gray-600 hover:text-emerald-600 transition-colors"
+                                title="Edit"
+                              >
+                                <FaEdit size={18} />
+                              </button>
+                              <button
+                                onClick={() => handleDelete(book)}
+                                className="p-1 text-gray-600 hover:text-rose-600 transition-colors"
+                                title="Delete"
+                              >
+                                <FaTrash size={18} />
+                              </button>
+                            </div>
+                          </TableCell>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
 
               {/* Pagination */}
               <div className="flex items-center justify-between mt-4">
                 <div className="text-sm text-gray-500">
-                  Showing {indexOfFirstItem + 1} to {Math.min(indexOfLastItem, filteredBooks.length)} of {filteredBooks.length} entries
+                  Showing {indexOfFirstItem + 1} to {Math.min(indexOfLastItem, searchedBooks.length)} of {searchedBooks.length} entries
                 </div>
                 <div className="flex items-center space-x-2">
                   <Button 
@@ -748,7 +648,6 @@ export default function Books() {
                   >
                     Previous
                   </Button>
-                  {/* Page numbers */}
                   {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
                     const pageNum = currentPage > 3 ? currentPage - 3 + i + 1 : i + 1;
                     if (pageNum <= totalPages) {

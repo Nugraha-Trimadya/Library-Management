@@ -6,9 +6,9 @@ export default function Template() {
     const isLoginPage = location.pathname === '/login';
 
     return(
-        <div className="flex">
+        <div className="flex h-screen">
             {!isLoginPage && <Sidebar />}
-            <div className={`${!isLoginPage ? '' : 'w-full'}`}>
+            <div className={`${!isLoginPage ? 'flex-1 overflow-auto' : 'w-full'}`}>
                 <Outlet />
             </div>
         </div>

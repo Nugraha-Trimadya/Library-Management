@@ -1,10 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { FaEye, FaSearch, FaPlus, FaInfoCircle,  FaUndo,FaCheckCircle, FaFileExcel} from 'react-icons/fa';
+import { FaEye, FaSearch, FaPlus, FaInfoCircle, FaUndo, FaCheckCircle, FaFileExcel } from 'react-icons/fa';
 import Swal from 'sweetalert2';
 import { API_URL } from '../../constant';
-import { useCallback } from 'react';
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
 // Modal Component from previous implementation
@@ -158,9 +157,40 @@ const BorrowingRules = () => (
 );
 
 // Fungsi untuk mengekspor data ke Excel
-const handleExportToExcel = () => {
+
+
+export default function Lendings() {
+  const [lendings, setLendings] = useState([]);
+  const [books, setBooks] = useState([]);
+  const [members, setMembers] = useState([]);
+  const [error, setError] = useState("");
+  const [alert, setAlert] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [showModal, setShowModal] = useState(false);
+  const [accordionOpen, setAccordionOpen] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(10);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [detailModalOpen, setDetailModalOpen] = useState(false);
+  const [detailLending, setDetailLending] = useState(null);
+  const [formModal, setFormModal] = useState({
+    id_buku: "",
+    id_member: "",
+    tgl_pinjam: "",
+    tgl_pengembalian: "",
+  });
+  const [selectedId, setSelectedId] = useState(null);
+  const [filteredData, setFilteredData] = useState([]);
+  const [sortConfig, setSortConfig] = useState({
+    key: null,
+    direction: 'asc'
+  });
+  const [lateFeesData, setLateFeesData] = useState([]); // State untuk data denda
+
+  const handleExportToExcel = () => {
   try {    // Persiapkan data untuk ekspor
-    const exportData = filteredData.map(lending => {
+
+    const exportData = lendings.map(lending => {
       const book = books.find(b => b.id === lending.id_buku) || {};
       const member = members.find(m => m.id === lending.id_member) || {};
       
@@ -244,34 +274,6 @@ const handleExportToExcel = () => {
     });
   }
 };
-
-export default function Lendings() {
-  const [lendings, setLendings] = useState([]);
-  const [books, setBooks] = useState([]);
-  const [members, setMembers] = useState([]);
-  const [error, setError] = useState("");
-  const [alert, setAlert] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [showModal, setShowModal] = useState(false);
-  const [accordionOpen, setAccordionOpen] = useState(false);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(10);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [detailModalOpen, setDetailModalOpen] = useState(false);
-  const [detailLending, setDetailLending] = useState(null);
-  const [formModal, setFormModal] = useState({
-    id_buku: "",
-    id_member: "",
-    tgl_pinjam: "",
-    tgl_pengembalian: "",
-  });
-  const [selectedId, setSelectedId] = useState(null);
-  const [filteredData, setFilteredData] = useState([]);
-  const [sortConfig, setSortConfig] = useState({
-    key: null,
-    direction: 'asc'
-  });
-  const [lateFeesData, setLateFeesData] = useState([]); // State untuk data denda
   
   const navigate = useNavigate();
   const getToken = localStorage.getItem('token');
@@ -319,11 +321,6 @@ export default function Lendings() {
         timerProgressBar: true
       });
       
-      Toast.fire({
-        icon: 'success',
-        title: 'Data berhasil dimuat'
-      });
-      
     } catch (err) {
       if (err.response && err.response.status === 401) {
         localStorage.removeItem("token");
@@ -361,7 +358,7 @@ export default function Lendings() {
 
     const searchString = searchTerm.toLowerCase().trim();    const filtered = lendings.filter(lending => {
       // Convert status_pengembalian to number if it's a boolean
-      lending.status_pengembalian = Number(lending.status_pengembalian);
+      lending.status_pengembalikan = Number(lending.status_pengembalikan);
       
       const book = books.find(b => b.id === lending.id_buku);
       const member = members.find(m => m.id === lending.id_member);
@@ -473,187 +470,197 @@ export default function Lendings() {
   };
 
   // Fungsi untuk menangani pengembalian buku
-const handleReturn = async (lending) => {
-  try {
-    // Pastikan perbandingan tanggal tidak bermasalah karena jam
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const returnDate = new Date(lending.tgl_pengembalian);
-    returnDate.setHours(0, 0, 0, 0);
-    const isOverdue = returnDate < today;
-    
-    // Kalkulasi keterlambatan dan denda jika terlambat
-    const daysLate = isOverdue ? Math.ceil((today - returnDate) / (1000 * 60 * 60 * 24)) : 0;
-    const suggestedFine = daysLate * 1000; // Rp 1.000 per hari
+  const handleReturn = async (lending) => {
+    try {
+      // Cek keterlambatan
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const returnDate = new Date(lending.tgl_pengembalian);
+      returnDate.setHours(0, 0, 0, 0);
+      const isOverdue = today > returnDate;
+      const daysLate = isOverdue ? Math.ceil((today - returnDate) / (1000 * 60 * 60 * 24)) : 0;
+      const fineAmount = daysLate * 1000; // Rp 1.000 per hari
 
-    let confirmResult = await Swal.fire({
-      title: 'Konfirmasi Pengembalian',
-      html: isOverdue 
-        ? `<div class="text-left">
-            <p class="mb-4">Buku ini terlambat dikembalikan:</p>
-            <p class="mb-2">• Keterlambatan: <span class="font-semibold text-red-600">${daysLate} hari</span></p>
-            <p class="mb-2">• Denda per hari: <span class="font-semibold">Rp. 1.000</span></p>
-            <p class="mb-2">• Total denda: <span class="font-semibold text-red-600">Rp. ${suggestedFine.toLocaleString('id-ID')}</span></p>
-           </div>`
-        : 'Apakah buku ini akan dikembalikan?',
-      icon: isOverdue ? 'warning' : 'question',
-      showCancelButton: true,
-      confirmButtonColor: '#10B981',
-      cancelButtonColor: '#EF4444',
-      confirmButtonText: 'Ya, Lanjutkan',
-      cancelButtonText: 'Batal'
-    });
-
-    if (!confirmResult.isConfirmed) return;
-
-    if (isOverdue) {
-      // Proses denda keterlambatan
-      let fineResult = await Swal.fire({
-        title: 'Proses Denda Keterlambatan',
+      // Form untuk pengembalian dan pengecekan kondisi buku
+      const { value: returnDetails } = await Swal.fire({
+        title: 'Pengecekan Pengembalian Buku',
         html: `
-          <div class="text-left space-y-4">
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Jumlah Denda</label>
-              <input id="fine-amount" type="number" min="1" value="${suggestedFine}" 
-                class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
+          <div class="text-left">
+            ${isOverdue ? `
+              <div class="mb-4 p-3 bg-red-50 rounded-md">
+                <p class="font-medium text-red-800">Keterlambatan Terdeteksi</p>
+                <p class="text-sm text-red-600">• ${daysLate} hari terlambat</p>
+                <p class="text-sm text-red-600">• Denda: Rp. ${fineAmount.toLocaleString('id-ID')}</p>
+              </div>
+            ` : ''}
+            <div class="mb-4">
+              <label class="block text-sm font-medium text-gray-700 mb-2">Kondisi Buku</label>
+              <select id="condition" class="w-full px-3 py-2 border rounded-md">
+                <option value="">Pilih Kondisi Buku</option>
+                <option value="baik">Baik (Tidak Ada Kerusakan)</option>
+                <option value="rusak">Rusak (Perlu Denda)</option>
+                <option value="lainnya">Lainnya</option>
+              </select>
             </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Deskripsi</label>
-              <textarea id="fine-description" 
-                class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500" 
-                placeholder="Denda keterlambatan ${daysLate} hari"></textarea>
+            <div id="damageForm" class="hidden">
+              <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Jenis Denda</label>
+                <select id="jenis_denda" class="w-full px-3 py-2 border rounded-md">
+                  <option value="kerusakan">Kerusakan</option>
+                  <option value="lainnya">Lainnya</option>
+                </select>
+              </div>
+              <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Deskripsi</label>
+                <textarea id="deskripsi" class="w-full px-3 py-2 border rounded-md" rows="3" 
+                  placeholder="Deskripsikan kerusakan atau alasan denda..."></textarea>
+              </div>
+              <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Jumlah Denda (Rp)</label>
+                <input type="number" id="jumlah_denda" class="w-full px-3 py-2 border rounded-md" 
+                  placeholder="Masukkan nominal denda" />
+              </div>
             </div>
           </div>
         `,
-        showCancelButton: true,
-        confirmButtonText: 'Proses Pengembalian & Denda',
-        cancelButtonText: 'Batal',
-        confirmButtonColor: '#10B981',
-        cancelButtonColor: '#EF4444',
+        didOpen: () => {
+          // Show/hide damage form based on condition selection
+          const conditionSelect = document.getElementById('condition');
+          const damageForm = document.getElementById('damageForm');
+          
+          conditionSelect.addEventListener('change', (e) => {
+            damageForm.style.display = e.target.value === 'baik' ? 'none' : 'block';
+          });
+        },
         preConfirm: () => {
-          const fineAmount = parseInt(document.getElementById('fine-amount').value);
-          const fineDescription = document.getElementById('fine-description').value.trim();
-
-          if (!fineAmount || fineAmount <= 0) {
-            Swal.showValidationMessage('Jumlah denda harus lebih dari 0');
+          const condition = document.getElementById('condition').value;
+          if (!condition) {
+            Swal.showValidationMessage('Pilih kondisi buku');
             return false;
           }
 
-          return {
-            fineAmount,
-            fineDescription: fineDescription || `Denda keterlambatan ${daysLate} hari`
-          };
+          if (condition !== 'baik') {
+            const jenisDenda = document.getElementById('jenis_denda').value;
+            const deskripsi = document.getElementById('deskripsi').value;
+            const jumlahDenda = document.getElementById('jumlah_denda').value;
+
+            if (!deskripsi || !jumlahDenda) {
+              Swal.showValidationMessage('Lengkapi detail denda');
+              return false;
+            }
+
+            return {
+              condition,
+              jenisDenda,
+              deskripsi,
+              jumlahDenda: parseInt(jumlahDenda)
+            };
+          }
+
+          return { condition };
+        },
+        showCancelButton: true,
+        confirmButtonText: 'Proses Pengembalian',
+        cancelButtonText: 'Batal',
+        confirmButtonColor: '#10B981',
+        cancelButtonColor: '#EF4444'
+      });
+
+      if (!returnDetails) return; // User canceled
+
+      // Proses pengembalian buku
+      await axios.put(`${API_URL}peminjaman/pengembalian/${lending.id}`, {
+        tgl_dikembalikan: today.toISOString().split('T')[0],
+        status_pengembalian: 1
+      }, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('token')}`,
+          Accept: 'application/json'
         }
       });
 
-      if (!fineResult.isConfirmed) return;
+      const dendasToCreate = [];
 
-      // Proses pengembalian dengan denda
-      const dendaData = {
-        id_member: lending.id_member,
-        id_buku: lending.id_buku,
-        jumlah_denda: fineResult.value.fineAmount,
-        jenis_denda: 'Keterlambatan',
-        deskripsi: fineResult.value.fineDescription,
-        status: 'Belum Dibayar'
-      };
-
-      // Create fine record            // Create fine record first
-            const fineResponse = await axios.post(`${API_URL}denda`, dendaData, {
-              headers: {
-                Authorization: `Bearer ${getToken}`,
-                Accept: 'application/json'
-              }
-            });
-
-            // Ask if user wants to go to fines page
-            const goToFinesResult = await Swal.fire({
-              title: 'Denda Tercatat',
-              text: 'Denda telah dicatat. Apakah Anda ingin melihat detail denda?',
-              icon: 'info',
-              showCancelButton: true,
-              confirmButtonColor: '#10B981',
-              cancelButtonColor: '#6B7280',
-              confirmButtonText: 'Ya, Lihat Denda',
-              cancelButtonText: 'Tidak, Tetap di Sini'
-            });
-
-            if (goToFinesResult.isConfirmed) {
-              navigate('/restorations'); // Navigate to fines page
-              return; // Exit early since we're navigating away
-            }
-    }    // Process book return
-    const returnData = {
-      id_buku: lending.id_buku,
-      id_member: lending.id_member,
-      tgl_pinjam: lending.tgl_pinjam,
-      tgl_pengembalian: lending.tgl_pengembalian,
-      tgl_dikembalikan: new Date().toISOString().split('T')[0],
-      status_pengembalian: 1
-    };
-
-    await axios.put(`${API_URL}peminjaman/${lending.id}`, returnData, {
-      headers: {
-        Authorization: `Bearer ${getToken}`,
-        Accept: 'application/json'
+      // Tambah denda keterlambatan jika ada
+      if (isOverdue) {
+        dendasToCreate.push({
+          id_member: lending.id_member,
+          id_buku: lending.id_buku,
+          jumlah_denda: fineAmount,
+          jenis_denda: 'terlambat',
+          deskripsi: `Keterlambatan pengembalian ${daysLate} hari`,
+        });
       }
-    });
 
-    // Update the local state immediately
-    setLendings(prevLendings => 
-      prevLendings.map(item => 
-        item.id === lending.id 
-          ? { ...item, ...returnData }
-          : item
-      )
-    );
-    
-    setFilteredData(prevFiltered => 
-      prevFiltered.map(item => 
-        item.id === lending.id 
-          ? { ...item, ...returnData }
-          : item
-      )
-    );    // Show success message and update UI immediately
-    await Swal.fire({
-      title: 'Berhasil!',
-      text: isOverdue 
-        ? 'Buku berhasil dikembalikan dan denda telah dicatat'
-        : 'Buku berhasil dikembalikan',
-      icon: 'success',
-      timer: 1500,
-      showConfirmButton: false
-    });
-    
-    // Update lendings and filteredData states without fetching
-    const updatedLending = {
-      ...lending,
-      status_pengembalian: 1,
-      tgl_dikembalikan: new Date().toISOString().split('T')[0]
-    };
+      // Tambah denda kerusakan/lainnya jika ada
+      if (returnDetails.condition !== 'baik') {
+        dendasToCreate.push({
+          id_member: lending.id_member,
+          id_buku: lending.id_buku,
+          jumlah_denda: returnDetails.jumlahDenda,
+          jenis_denda: returnDetails.jenisDenda,
+          deskripsi: returnDetails.deskripsi,
+        });
+      }
 
-    setLendings(prevLendings => 
-      prevLendings.map(item => 
-        item.id === lending.id ? updatedLending : item
-      )
-    );
+      // Buat semua denda yang diperlukan
+      for (const denda of dendasToCreate) {
+        await axios.post(`${API_URL}denda`, denda, {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem('token')}`,
+            Accept: 'application/json'
+          }
+        });
+      }
 
-    setFilteredData(prevFiltered => 
-      prevFiltered.map(item => 
-        item.id === lending.id ? updatedLending : item
-      )
-    );
+      // Tampilkan ringkasan denda
+      if (dendasToCreate.length > 0) {
+        const totalDenda = dendasToCreate.reduce((sum, denda) => sum + denda.jumlah_denda, 0);
+        await Swal.fire({
+          icon: 'warning',
+          title: 'Buku Dikembalikan dengan Denda',
+          html: `
+            <div class="text-left">
+              <p class="mb-3">Rincian denda yang harus dibayar:</p>
+              <ul class="list-disc pl-5 mb-4">
+                ${dendasToCreate.map(denda => `
+                  <li class="mb-2">
+                    <span class="font-medium">${denda.jenis_denda === 'terlambat' ? 'Denda Keterlambatan' : 
+                    denda.jenis_denda === 'kerusakan' ? 'Denda Kerusakan' : 'Denda Lainnya'}</span><br>
+                    <span class="text-sm">Rp. ${denda.jumlah_denda.toLocaleString('id-ID')}</span>
+                  </li>
+                `).join('')}
+              </ul>
+              <p class="text-lg font-semibold text-red-600">Total Denda: Rp. ${totalDenda.toLocaleString('id-ID')}</p>
+              <p class="mt-3 text-sm text-gray-600">Silahkan selesaikan pembayaran di menu Denda.</p>
+            </div>
+          `,
+          confirmButtonColor: '#10B981',
+          confirmButtonText: 'Mengerti'
+        });
+      } else {
+        await Swal.fire({
+          icon: 'success',
+          title: 'Berhasil',
+          text: 'Buku berhasil dikembalikan tanpa denda',
+          timer: 1500,
+          showConfirmButton: false
+        });
+      }
 
-  } catch (err) {
-    console.error('Error:', err);
-    Swal.fire({
-      icon: 'error',
-      title: 'Error',
-      text: 'Terjadi kesalahan saat memproses pengembalian atau denda'
-    });
-  }
-};
+      // Refresh data
+      await fetchData();
 
+    } catch (error) {
+      console.error('Error returning book:', error);
+      Swal.fire({
+        icon: 'error',
+        title: 'Gagal',
+        text: error.response?.data?.message || 'Terjadi kesalahan saat mengembalikan buku',
+        confirmButtonColor: '#EF4444'
+      });
+    }
+  };
 
   // Pagination yang ditingkatkan
   const indexOfLastItem = currentPage * itemsPerPage;
@@ -912,7 +919,7 @@ const handleReturn = async (lending) => {
                     const member = members.find(m => m.id === lending.id_member);
                     const book = books.find(b => b.id === lending.id_buku);
                     // Convert status_pengembalian to number
-                    lending.status_pengembalian = Number(lending.status_pengembalian);
+                    lending.status_pengembalikan = Number(lending.status_pengembalikan);
                     const isOverdue = new Date(lending.tgl_pengembalian) < new Date();
                     
                     return (

@@ -148,7 +148,7 @@ export default function Sidebar() {
                         onClick={logoutHandler}
                         className={`${
                             open ? "px-4 py-3 w-full" : "p-2"
-                        } mt-6 flex items-center gap-3.5 text-sm font-medium
+                        } mt-70 flex items-center gap-3.5 text-sm font-medium
                         text-gray-600 hover:text-rose-600 hover:bg-rose-50
                         rounded-md transition-all duration-200 group`}
                     >
